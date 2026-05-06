@@ -1,0 +1,320 @@
+{
+  "name": "Law Firm — Google Sheets to Database",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "a471673d-930a-4708-bcba-5a3470ae2da6",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1fqKqhpumzpxh4Kv2LHjU3WXM0zMOjR1ZTuK86rke2Q8",
+          "mode": "list",
+          "cachedResultName": "CrimeCase",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fqKqhpumzpxh4Kv2LHjU3WXM0zMOjR1ZTuK86rke2Q8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "CrimeCase",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fqKqhpumzpxh4Kv2LHjU3WXM0zMOjR1ZTuK86rke2Q8/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "41f79d4b-12c5-4c5d-b440-521004426aa7",
+      "name": "Read Cases Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -192,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WmfCaGJ0W1FQzi51",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-case-id",
+              "leftValue": "={{ $json['Case ID'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "cond-client",
+              "leftValue": "={{ $json['Client Name'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "cond-status",
+              "leftValue": "={{ $json['Status'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "16275707-cb37-438f-a9d4-bb0331d89e87",
+      "name": "Validate Row",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nreturn rows.map(item => {\n  const d = item.json;\n  // Normalise date fields\n  const parseDate = (val) => {\n    if (!val) return null;\n    const d = new Date(val);\n    return isNaN(d) ? null : d.toISOString().split('T')[0];\n  };\n  return {\n    json: {\n      case_id:        (d['Case ID'] || '').toString().trim(),\n      client_name:    (d['Client Name'] || '').toString().trim(),\n      case_type:      (d['Case Type'] || '').toString().trim(),\n      status:         (d['Status'] || '').toString().trim().toLowerCase(),\n      assigned_to:    (d['Assigned Attorney'] || '').toString().trim(),\n      filed_date:     parseDate(d['Filed Date']),\n      hearing_date:   parseDate(d['Hearing Date']),\n      notes:          (d['Notes'] || '').toString().trim(),\n      last_synced_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "id": "c729b3aa-739e-4a92-8bad-317b951c5b31",
+      "name": "Transform Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "mode": "define",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "cases"
+        },
+        "dataMode": "defineBelow",
+        "valueToMatchOn": "={{ $json.case_id }}",
+        "options": {}
+      },
+      "id": "cff890e8-f504-4595-829b-d683b60c058b",
+      "name": "Upsert to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        608
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "xu0EeI3KIex6BZva",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1fqKqhpumzpxh4Kv2LHjU3WXM0zMOjR1ZTuK86rke2Q8",
+          "mode": "list",
+          "cachedResultName": "CrimeCase",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fqKqhpumzpxh4Kv2LHjU3WXM0zMOjR1ZTuK86rke2Q8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "CrimeCase",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fqKqhpumzpxh4Kv2LHjU3WXM0zMOjR1ZTuK86rke2Q8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Case ID",
+              "displayName": "Case ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Client Name",
+              "displayName": "Client Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "values": {}
+        },
+        "options": {}
+      },
+      "id": "559ab314-30ae-46f8-80b1-65ac550d5aa9",
+      "name": "Log Invalid Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -16,
+        480
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WmfCaGJ0W1FQzi51",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "mode": "id",
+          "value": "YOUR_SLACK_CHANNEL_ID"
+        },
+        "text": "=*Law Firm Daily Import Complete*\n• Records processed: {{ $runIndex }}\n• Date: {{ $now.format('yyyy-MM-dd') }}\n• Status: ✅ Success",
+        "otherOptions": {}
+      },
+      "id": "7392b1e0-7c25-4749-8eaf-40083e3ef421",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        608
+      ],
+      "webhookId": "0f2383e7-6059-4d8d-a573-5938c20fca4b"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Cases Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Cases Sheet": {
+      "main": [
+        [
+          {
+            "node": "Validate Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Row": {
+      "main": [
+        [
+          {
+            "node": "Transform Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Invalid Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Data": {
+      "main": [
+        [
+          {
+            "node": "Upsert to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert to PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "25415989-0e10-4d5f-8491-0c0e2d56e0dc",
+  "meta": {
+    "instanceId": "ea8557ba88045569cfbf514cd56a961789c05812b20e6d18798cf09d5ee121c8"
+  },
+  "id": "dR9AGRK4eSbykZPk",
+  "tags": []
+}
